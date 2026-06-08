@@ -60,6 +60,7 @@ def test_dify_fallback_in_pipeline(tmp_path, mocker):
     # The pipeline should complete with fallback, although FFmpeg actual render
     # might fail/fallback due to empty libraries, but let's check it doesn't crash
     # because of Dify exception
+    assert updated_job.dify_success is False
     assert updated_job.status in (VideoJobStatus.succeeded, VideoJobStatus.failed)
     # If it failed, check that the failure is NOT "Dify service unavailable"
     if updated_job.status == VideoJobStatus.failed:

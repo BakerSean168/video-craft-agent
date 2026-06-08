@@ -137,6 +137,13 @@ if st.button("🚀 开始生成短视频", type="primary", use_container_width=T
                             st.balloons()
                             st.success("🎉 视频生成成功！")
                             
+                            # Display Dify Response Status
+                            dify_success = job_info.get("dify_success")
+                            if dify_success is True:
+                                st.success("✅ **智能生成**：已成功获取并使用 Dify AI 工作流脚本分镜。")
+                            elif dify_success is False:
+                                st.warning("⚠️ **模版兜底**：Dify 接口调用或解析失败，已自动启用本地预设模版生成视频。")
+                            
                             # Layout results
                             col1, col2 = st.columns(2)
                             

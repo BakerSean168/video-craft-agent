@@ -101,6 +101,7 @@ def test_video_pipeline_run_success(tmp_path, temp_video_generator, mocker):
     # Fetch job status after completion
     updated_job = pipeline.get_job(job.job_id)
     assert updated_job.status == VideoJobStatus.succeeded
+    assert updated_job.dify_success is True
     assert updated_job.result is not None
     assert updated_job.result.status == "success"
     assert Path(updated_job.result.output_path).exists()

@@ -78,3 +78,4 @@ class VideoJob(BaseModel):
     result: RenderResult | None = None
     video_url: str | None = None
     error: str | None = None
+    dify_success: bool | None = None

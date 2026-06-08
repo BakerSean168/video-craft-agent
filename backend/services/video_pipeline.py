@@ -169,8 +169,10 @@ class VideoPipeline:
                     script_data = json.loads(script_data)
                 if not isinstance(script_data, dict):
                     raise ValueError(f"Dify script output is not a dictionary: {script_data}")
+                job.dify_success = True
             except Exception as dify_exc:
                 logger.warning(f"Dify workflow execution failed, falling back to local template: {dify_exc}")
+                job.dify_success = False
                 script_data = generate_fallback_script(job.requirement)
             
             # Step 2: Validate script outputs from Dify / Fallback
