@@ -13,6 +13,9 @@ from services.video_pipeline import VideoPipeline
 
 logger = logging.getLogger(__name__)
 
+ALLOWED_EXTENSIONS = {".mp4", ".mov", ".avi", ".webm", ".mkv"}
+MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
+
 router = APIRouter(prefix="/api/video-jobs", tags=["video-jobs"])
 pipeline = VideoPipeline()
 
@@ -48,6 +51,16 @@ def create_video_job(
     # Save uploaded files if any
     uploads = []
     if files:
+        # Validate all files first
+        for f in files:
+            if not f.filename:
+                continue
+            ext = Path(f.filename).suffix.lower()
+            if ext not in ALLOWED_EXTENSIONS:
+                raise HTTPException(status_code=400, detail=f"Unsupported file format: {ext}")
+            if hasattr(f, "size") and f.size and f.size > MAX_FILE_SIZE:
+                raise HTTPException(status_code=400, detail="File size exceeds the 100MB limit")
+
         job_upload_dir = pipeline.uploads_dir / job.job_id
         job_upload_dir.mkdir(parents=True, exist_ok=True)
         
@@ -95,8 +108,44 @@ def get_video_job(job_id: str) -> VideoJob:
     return job
 
 
+from pydantic import BaseModel
+
+class ConvertRequest(BaseModel):
+    target_format: str
+
+
+@router.post("/{job_id}/convert")
+def convert_video_job_format(job_id: str, request: ConvertRequest) -> dict:
+    job = pipeline.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job.status != VideoJobStatus.succeeded or not job.result or not job.result.output_path:
+        raise HTTPException(status_code=400, detail="Original video is not ready")
+        
+    target_fmt = request.target_format.lower().strip()
+    if target_fmt not in {"gif", "webm", "mov", "mp4"}:
+        raise HTTPException(status_code=400, detail=f"Unsupported format: {target_fmt}")
+        
+    original_path = Path(job.result.output_path)
+    target_path = original_path.with_suffix(f".{target_fmt}")
+    
+    if not target_path.exists():
+        from tools.ffmpeg_editor import VideoEditor
+        try:
+            editor = VideoEditor()
+            editor.convert_format(str(original_path), str(target_path), target_fmt)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Conversion failed: {str(e)}")
+            
+    return {
+        "job_id": job_id,
+        "target_format": target_fmt,
+        "download_url": f"/api/video-jobs/{job_id}/video?format={target_fmt}"
+    }
+
+
 @router.get("/{job_id}/video")
-def get_video_file(job_id: str) -> FileResponse:
+def get_video_file(job_id: str, format: Optional[str] = None) -> FileResponse:
     job = pipeline.get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -104,12 +153,32 @@ def get_video_file(job_id: str) -> FileResponse:
     if job.status != VideoJobStatus.succeeded or not job.result or not job.result.output_path:
         raise HTTPException(status_code=400, detail="Video is not ready or generation failed")
         
-    video_path = Path(job.result.output_path)
-    if not video_path.exists():
+    original_path = Path(job.result.output_path)
+    
+    if format:
+        target_fmt = format.lower().strip()
+        file_path = original_path.with_suffix(f".{target_fmt}")
+        if not file_path.exists():
+            raise HTTPException(status_code=400, detail=f"Format {target_fmt} is not converted yet. Please call /convert first.")
+        
+        media_types = {
+            "gif": "image/gif",
+            "webm": "video/webm",
+            "mov": "video/quicktime",
+            "mp4": "video/mp4"
+        }
+        media_type = media_types.get(target_fmt, "application/octet-stream")
+        return FileResponse(
+            path=str(file_path),
+            media_type=media_type,
+            filename=f"final.{target_fmt}"
+        )
+        
+    if not original_path.exists():
         raise HTTPException(status_code=404, detail="Video file not found on disk")
         
     return FileResponse(
-        path=str(video_path),
+        path=str(original_path),
         media_type="video/mp4",
         filename="final.mp4"
     )

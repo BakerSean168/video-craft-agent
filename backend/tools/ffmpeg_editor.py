@@ -26,6 +26,36 @@ def escape_text(text: str) -> str:
     return t
 
 
+def wrap_text(text: str, max_chars: int = 12) -> str:
+    if len(text) <= max_chars:
+        return text
+        
+    # If text contains spaces, we wrap on word boundaries (e.g. English)
+    if " " in text:
+        words = text.split(" ")
+        lines = []
+        current_line = []
+        current_len = 0
+        for w in words:
+            if current_len + len(w) + (1 if current_line else 0) <= max_chars:
+                current_line.append(w)
+                current_len += len(w) + (1 if len(current_line) > 1 else 0)
+            else:
+                if current_line:
+                    lines.append(" ".join(current_line))
+                current_line = [w]
+                current_len = len(w)
+        if current_line:
+            lines.append(" ".join(current_line))
+        return "\n".join(lines)
+    else:
+        # Character-by-character wrap (e.g. Chinese)
+        lines = []
+        for i in range(0, len(text), max_chars):
+            lines.append(text[i:i+max_chars])
+        return "\n".join(lines)
+
+
 class VideoEditor:
     def get_duration(self, input_path: str) -> float:
         cmd = [
@@ -57,7 +87,8 @@ class VideoEditor:
         width: int = 1080,
         height: int = 1920
     ) -> None:
-        escaped_text = escape_text(subtitle)
+        wrapped_subtitle = wrap_text(subtitle, max_chars=12)
+        escaped_text = escape_text(wrapped_subtitle)
         font_path = get_escaped_font_path()
         
         # Build drawtext filter part
@@ -132,3 +163,81 @@ class VideoEditor:
         finally:
             if os.path.exists(temp_txt_path):
                 os.remove(temp_txt_path)
+
+    def add_bgm(
+        self,
+        video_path: str,
+        bgm_path: str,
+        output_path: str,
+        bgm_volume: float = 0.3,
+        video_volume: float = 1.0
+    ) -> None:
+        has_aud = self.has_audio(video_path)
+        
+        if has_aud:
+            cmd = [
+                "ffmpeg", "-y",
+                "-i", video_path,
+                "-i", bgm_path,
+                "-filter_complex", f"[0:a]volume={video_volume}[a1]; [1:a]volume={bgm_volume}[a2]; [a1][a2]amix=inputs=2:duration=first[a]",
+                "-map", "0:v",
+                "-map", "[a]",
+                "-c:v", "copy",
+                "-c:a", "aac",
+                "-shortest",
+                output_path
+            ]
+        else:
+            cmd = [
+                "ffmpeg", "-y",
+                "-i", video_path,
+                "-i", bgm_path,
+                "-filter_complex", f"[1:a]volume={bgm_volume}[a]",
+                "-map", "0:v",
+                "-map", "[a]",
+                "-c:v", "copy",
+                "-c:a", "aac",
+                "-shortest",
+                output_path
+            ]
+            
+        result = subprocess.run(cmd, capture_output=True, encoding="utf-8", errors="replace")
+        if result.returncode != 0:
+            raise RuntimeError(f"FFmpeg add_bgm failed: {result.stderr}")
+
+    def convert_format(self, input_path: str, output_path: str, target_format: str) -> None:
+        fmt = target_format.lower()
+        if fmt == "gif":
+            cmd = [
+                "ffmpeg", "-y",
+                "-i", input_path,
+                "-filter_complex", "[0:v] split [a][b]; [a] palettegen [p]; [b][p] paletteuse",
+                output_path
+            ]
+        elif fmt == "webm":
+            cmd = [
+                "ffmpeg", "-y",
+                "-i", input_path,
+                "-c:v", "libvpx-vp9",
+                "-deadline", "realtime",
+                "-c:a", "libopus",
+                output_path
+            ]
+        elif fmt == "mov":
+            cmd = [
+                "ffmpeg", "-y",
+                "-i", input_path,
+                "-c:v", "libx264",
+                "-c:a", "aac",
+                output_path
+            ]
+        else:
+            cmd = [
+                "ffmpeg", "-y",
+                "-i", input_path,
+                output_path
+            ]
+            
+        result = subprocess.run(cmd, capture_output=True, encoding="utf-8", errors="replace")
+        if result.returncode != 0:
+            raise RuntimeError(f"FFmpeg convert_format failed: {result.stderr}")

@@ -108,10 +108,23 @@ class DifyClient:
         text = value.strip()
         if not text:
             return value
+        
+        # Clean markdown code blocks
         if text.startswith("```"):
             lines = text.splitlines()
             if len(lines) >= 3 and lines[-1].strip() == "```":
                 text = "\n".join(lines[1:-1]).strip()
+            elif text.startswith("```json"):
+                text = text[7:].strip()
+            else:
+                text = text[3:].strip()
+                
+            if text.endswith("```"):
+                text = text[:-3].strip()
+
+        # Repair trailing commas in arrays/objects
+        import re
+        text = re.sub(r',\s*([\]}])', r'\1', text)
 
         try:
             return json.loads(text)
