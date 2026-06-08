@@ -1,0 +1,45 @@
+# Python bytecode / Caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+
+# Environment configurations and Secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Local storage and generated files (Jobs, uploads and final outputs)
+storage/
+**/storage/
+
+# Large media assets (prevent committing large video/audio files to Git)
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+*.mp3
+*.wav
+
+# Editor / IDE settings
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
