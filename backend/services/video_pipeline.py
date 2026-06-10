@@ -1,73 +1,70 @@
 import os
 import uuid
 import logging
+import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from core.config import get_settings
 from core.models import VideoRequirement
 from core.schemas import (
-    VideoJob, VideoJobStatus, VideoScript, UploadedMaterial, 
-    MaterialMatch, RenderResult
+    VideoJob, VideoJobStatus, UploadedMaterial, 
+    MaterialMatch, RenderResult, EditPlan, EditScene, EditSceneOperation
 )
 from services.dify_client import DifyClient, DifyError
-from tools.material_search import MaterialSearcher
+from services.jobs_db import VideoJobsDB
+from services.frame_service import FrameService
+from services.plan_validator import validate_edit_plan
 from tools.ffmpeg_editor import VideoEditor
+from core.frame_models import AssetProfile
 
 logger = logging.getLogger(__name__)
 
-# In-memory database of video jobs
-_JOBS_DB: dict[str, VideoJob] = {}
 
-
-def generate_fallback_script(requirement: VideoRequirement) -> dict[str, Any]:
+def generate_fallback_edit_plan(requirement: VideoRequirement, assets: list[AssetProfile]) -> dict[str, Any]:
     duration = requirement.duration_seconds
-    scene_count = 3
+    scene_count = max(1, len(assets)) if assets else 3
     scene_duration = max(1, duration // scene_count)
     scene_durations = [scene_duration] * (scene_count - 1)
     scene_durations.append(duration - sum(scene_durations))
     
     product_name = requirement.product_name
-    target_audience = requirement.target_audience
     
-    selling_points = requirement.selling_points
-    if isinstance(selling_points, list):
-        selling_points_str = ", ".join(selling_points)
-    else:
-        selling_points_str = str(selling_points)
+    timeline = []
+    for idx in range(scene_count):
+        if assets:
+            asset = assets[idx % len(assets)]
+            asset_id = asset.asset_id
+            source_end = min(float(scene_durations[idx]), asset.duration)
+        else:
+            asset_id = f"asset_{idx+1:03d}"
+            source_end = float(scene_durations[idx])
+            
+        start_time = sum(scene_durations[:idx])
+        end_time = start_time + scene_durations[idx]
         
-    scenes = [
-        {
-            "index": 1,
-            "duration_seconds": scene_durations[0],
-            "subtitle": f"想了解 {product_name} 吗？",
-            "voiceover": f"为您隆重推介 {product_name}！专门为 {target_audience} 打造，开启您的全新体验！",
-            "visual_keywords": ["future", "technology", "ai"],
-            "source_hint": "uploaded_or_library"
-        },
-        {
-            "index": 2,
-            "duration_seconds": scene_durations[1],
-            "subtitle": f"核心卖点：{selling_points_str[:12]}...",
-            "voiceover": f"它具备超强优势，包括：{selling_points_str}。让您轻松上手！",
-            "visual_keywords": ["study", "work", "learn"],
-            "source_hint": "uploaded_or_library"
-        },
-        {
-            "index": 3,
-            "duration_seconds": scene_durations[2],
-            "subtitle": "挑战极限，成就梦想！",
-            "voiceover": f"别再犹豫了，适合 {target_audience} 的最佳选择，赶快行动吧！",
-            "visual_keywords": ["success", "challenge", "win"],
-            "source_hint": "uploaded_or_library"
-        }
-    ]
-    
+        timeline.append({
+            "scene_id": idx + 1,
+            "asset_id": asset_id,
+            "source_start": 0.0,
+            "source_end": float(source_end),
+            "start_time": float(start_time),
+            "end_time": float(end_time),
+            "subtitle": f"期待您的 {product_name} 体验！" if idx == 0 else f"{product_name} - 分镜 {idx+1}",
+            "voiceover": f"展示分镜 {idx+1} 的画面",
+            "operation": {
+                "speed": 1.0,
+                "crop_mode": "center_crop",
+                "mute_audio": False
+            }
+        })
+        
     return {
         "title": f"{product_name} - 推广视频",
         "aspect_ratio": "9:16",
         "duration_seconds": duration,
-        "scenes": scenes
+        "timeline": timeline,
+        "warnings": ["使用本地模版生成的兜底剪辑方案"]
     }
 
 
@@ -92,26 +89,44 @@ class VideoPipeline:
         self.uploads_dir.mkdir(parents=True, exist_ok=True)
         self.outputs_dir.mkdir(parents=True, exist_ok=True)
         self.jobs_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Initialize SQLite DB
+        self.db = VideoJobsDB(self.jobs_dir / "jobs.db")
+        
+        # Initialize FrameService using settings
+        settings = get_settings()
+        self.frame_service = FrameService(settings.frame_analyzer_url)
 
-    def create_job(self, requirement: VideoRequirement, uploads: list[UploadedMaterial]) -> VideoJob:
+    def create_job(self, requirement: VideoRequirement, asset_ids: list[str]) -> VideoJob:
         job_id = str(uuid.uuid4())
+        
+        # Load asset profiles from DB
+        assets = []
+        for aid in asset_ids:
+            item = self.db.get_asset(aid)
+            if item and item.status == "completed" and item.profile:
+                assets.append(item.profile)
+            else:
+                logger.warning(f"Selected asset {aid} not found or not completed in database.")
+
         job = VideoJob(
             job_id=job_id,
             status=VideoJobStatus.queued,
             current_step="任务已创建",
             requirement=requirement,
-            uploads=uploads
+            uploads=[],
+            assets=assets
         )
         
         # Create job output folders
         (self.jobs_dir / job_id).mkdir(parents=True, exist_ok=True)
         (self.outputs_dir / job_id).mkdir(parents=True, exist_ok=True)
         
-        _JOBS_DB[job_id] = job
+        self.db.save_job(job)
         return job
 
     def get_job(self, job_id: str) -> VideoJob | None:
-        return _JOBS_DB.get(job_id)
+        return self.db.get_job(job_id)
 
     def _find_bgm(self, style: str) -> str | None:
         # Check standard assets/music folder
@@ -155,43 +170,65 @@ class VideoPipeline:
         try:
             settings = get_settings()
             
-            # Step 1: Call Dify with local fallback
+            # Step 1: Asset Analysis (Assets loaded directly from library)
+            job.status = VideoJobStatus.analyzing_assets
+            job.current_step = "正在从素材库加载素材画像..."
+            self.db.save_job(job)
+            
+            if not job.assets:
+                logger.warning(f"Job {job_id} has no assets selected.")
+            
+            # Step 2: Call Dify to generate EditPlan
             job.status = VideoJobStatus.calling_dify
-            job.current_step = "正在调用 Dify 生成视频脚本..."
+            job.current_step = "正在调用 Dify 进行智能编排与剪辑策划..."
+            self.db.save_job(job)
+            
+            # Serialize assets profiles to JSON
+            assets_list = [a.model_dump() for a in job.assets]
+            assets_json = json.dumps(assets_list, ensure_ascii=False)
+            
+            dify_inputs = job.requirement.to_dify_inputs()
+            dify_inputs["assets_json"] = assets_json
             
             try:
                 client = DifyClient.from_settings(settings)
-                result = client.run_workflow(job.requirement.to_dify_inputs())
-                script_data = result.script
-                # Parse to dict if it was returned as string
-                if isinstance(script_data, str):
-                    import json
-                    script_data = json.loads(script_data)
-                if not isinstance(script_data, dict):
-                    raise ValueError(f"Dify script output is not a dictionary: {script_data}")
+                result = client.run_workflow(dify_inputs)
+                edit_plan_data = result.script
+                # Parse if returned as string
+                if isinstance(edit_plan_data, str):
+                    edit_plan_data = json.loads(edit_plan_data)
+                
+                if not isinstance(edit_plan_data, dict):
+                    raise ValueError(f"Dify EditPlan output is not a dictionary: {edit_plan_data}")
                 job.dify_success = True
             except Exception as dify_exc:
                 logger.warning(f"Dify workflow execution failed, falling back to local template: {dify_exc}")
                 job.dify_success = False
-                script_data = generate_fallback_script(job.requirement)
+                edit_plan_data = generate_fallback_edit_plan(job.requirement, job.assets)
+                
+            # Step 3: Validate and auto-correct EditPlan
+            job.current_step = "正在校验剪辑方案的有效性与连续性..."
+            self.db.save_job(job)
             
-            # Step 2: Validate script outputs from Dify / Fallback
-            script = VideoScript(**script_data)
-            job.script = script
+            asset_map = {a.asset_id: a for a in job.assets}
+            warnings = validate_edit_plan(edit_plan_data, asset_map, job.requirement.duration_seconds)
+            
+            # Add warnings to the edit plan data
+            if "warnings" not in edit_plan_data:
+                edit_plan_data["warnings"] = []
+            edit_plan_data["warnings"].extend(warnings)
+            
+            edit_plan = EditPlan(**edit_plan_data)
+            job.edit_plan = edit_plan
+            
             job.status = VideoJobStatus.script_ready
-            job.current_step = "视频脚本生成并校验成功"
+            job.current_step = "剪辑方案生成并校验成功"
+            self.db.save_job(job)
             
-            # Step 3: Match materials
-            job.status = VideoJobStatus.matching_materials
-            job.current_step = "正在匹配分镜视频素材..."
-            
-            searcher = MaterialSearcher(library_dir=self.library_dir)
-            matches = searcher.match_materials(script, job.uploads)
-            job.materials = matches
-            
-            # Step 4: Render each scene clip
+            # Step 4: Render video clips
             job.status = VideoJobStatus.rendering_video
-            job.current_step = "正在使用 FFmpeg 渲染分镜并合成视频..."
+            job.current_step = "正在使用 FFmpeg 精确裁剪并渲染各分镜画面..."
+            self.db.save_job(job)
             
             clips_dir = self.jobs_dir / job_id / "clips"
             clips_dir.mkdir(parents=True, exist_ok=True)
@@ -201,24 +238,48 @@ class VideoPipeline:
             
             # Choose dimensions based on aspect ratio
             width, height = 1080, 1920
-            if script.aspect_ratio == "9:16":
-                # For tests or local development, default to smaller size to improve speed
+            if edit_plan.aspect_ratio == "9:16":
                 if "pytest" in os.environ or "test" in str(self.jobs_dir).lower():
                     width, height = 540, 960
-            
-            for match in matches:
-                scene = next(s for s in script.scenes if s.index == match.scene_index)
-                clip_path = clips_dir / f"scene_{scene.index}.mp4"
+                    
+            # Keep compatibility: map timeline scenes to MaterialMatches
+            matches = []
+            for scene in edit_plan.timeline:
+                material_path = None
+                # Resolve material path from assets profiles
+                for asset in job.assets:
+                    if asset.asset_id == scene.asset_id:
+                        material_path = asset.local_path
+                        break
+                if not material_path:
+                    raise ValueError(f"Material file not found in assets for asset_id: {scene.asset_id}")
+                    
+                matches.append(
+                    MaterialMatch(
+                        scene_index=scene.scene_id,
+                        material_path=material_path,
+                        source="uploaded",
+                    )
+                )
                 
+                # Render Clip
+                clip_path = clips_dir / f"scene_{scene.scene_id}.mp4"
                 editor.trim_and_render_clip(
-                    input_path=match.material_path,
+                    input_path=material_path,
                     output_path=str(clip_path),
-                    duration=scene.duration_seconds,
+                    duration=scene.end_time - scene.start_time,
                     subtitle=scene.subtitle,
                     width=width,
-                    height=height
+                    height=height,
+                    start_time=scene.source_start,
+                    end_time=scene.source_end,
+                    speed=scene.operation.speed,
+                    mute_audio=scene.operation.mute_audio
                 )
                 clip_paths.append(str(clip_path))
+                
+            job.materials = matches
+            self.db.save_job(job)
             
             # Step 5: Concat all clips to a temp file
             temp_concat_path = self.jobs_dir / job_id / "temp_concat.mp4"
@@ -241,7 +302,7 @@ class VideoPipeline:
                 logger.info("No background music found, outputting raw concat video.")
                 import shutil
                 shutil.copy(str(temp_concat_path), str(final_output_path))
-            
+                
             # Complete
             job.status = VideoJobStatus.succeeded
             job.current_step = "视频渲染并合成成功"
@@ -249,10 +310,11 @@ class VideoPipeline:
             job.result = RenderResult(
                 status="success",
                 output_path=str(final_output_path),
-                duration_seconds=script.duration_seconds,
+                duration_seconds=edit_plan.duration_seconds,
                 format="mp4",
                 message="视频合成成功"
             )
+            self.db.save_job(job)
             
         except Exception as exc:
             logger.exception(f"Error executing pipeline for job {job_id}: {exc}")
@@ -266,3 +328,4 @@ class VideoPipeline:
                 format="mp4",
                 message=str(exc)
             )
+            self.db.save_job(job)

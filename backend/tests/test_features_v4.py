@@ -80,7 +80,7 @@ def test_api_convert_endpoint(temp_media_generator, mocker, tmp_path):
     client = TestClient(app)
 
     # 1. Setup mock pipeline job
-    from services.video_pipeline import _JOBS_DB, VideoPipeline
+    from services.video_pipeline import VideoPipeline
     from core.models import VideoRequirement
     from core.schemas import VideoJob, RenderResult
 
@@ -90,6 +90,9 @@ def test_api_convert_endpoint(temp_media_generator, mocker, tmp_path):
         outputs_dir=tmp_path / "outputs",
         jobs_dir=tmp_path / "jobs"
     )
+    
+    # Patch global pipeline in API router to use this test pipeline instance
+    mocker.patch("api.video_jobs.pipeline", pipeline)
     
     req = VideoRequirement(
         product_name="BGM App",
@@ -119,7 +122,7 @@ def test_api_convert_endpoint(temp_media_generator, mocker, tmp_path):
     )
     
     # Register in DB
-    _JOBS_DB[job.job_id] = job
+    pipeline.db.save_job(job)
 
     # 2. Call Convert Endpoint
     convert_data = {"target_format": "gif"}

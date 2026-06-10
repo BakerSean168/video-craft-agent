@@ -2,6 +2,7 @@ import os
 import subprocess
 import tempfile
 from pathlib import Path
+from typing import Optional
 
 
 def get_escaped_font_path() -> str | None:
@@ -85,7 +86,11 @@ class VideoEditor:
         duration: float,
         subtitle: str,
         width: int = 1080,
-        height: int = 1920
+        height: int = 1920,
+        start_time: float = 0.0,
+        end_time: Optional[float] = None,
+        speed: float = 1.0,
+        mute_audio: bool = False
     ) -> None:
         wrapped_subtitle = wrap_text(subtitle, max_chars=12)
         escaped_text = escape_text(wrapped_subtitle)
@@ -97,33 +102,59 @@ class VideoEditor:
             drawtext_part += f":fontfile='{font_path}'"
             
         video_filter = f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},{drawtext_part}"
+        if speed != 1.0:
+            video_filter += f",setpts=PTS/{speed}"
+            
+        # Determine source duration and final output duration
+        if end_time is not None:
+            source_dur = end_time - start_time
+        else:
+            source_dur = duration
+            
+        output_duration = source_dur / speed
         
-        # Determine if source has audio
-        source_has_audio = self.has_audio(input_path)
+        # Determine if source has audio and we want to keep it
+        use_source_audio = self.has_audio(input_path) and not mute_audio
         
-        if source_has_audio:
+        def get_atempo_filter(s: float) -> str:
+            filters = []
+            while s > 2.0:
+                filters.append("atempo=2.0")
+                s /= 2.0
+            while s < 0.5:
+                filters.append("atempo=0.5")
+                s /= 0.5
+            if s != 1.0:
+                filters.append(f"atempo={s}")
+            return ",".join(filters)
+            
+        if use_source_audio:
             cmd = [
                 "ffmpeg", "-y",
-                "-ss", "0",
+                "-ss", str(start_time),
                 "-i", input_path,
-                "-t", str(duration),
+                "-t", str(output_duration),
                 "-vf", video_filter,
                 "-c:v", "libx264",
                 "-pix_fmt", "yuv420p",
                 "-r", "25",
+            ]
+            if speed != 1.0:
+                cmd.extend(["-filter:a", get_atempo_filter(speed)])
+            cmd.extend([
                 "-c:a", "aac",
                 "-ar", "44100",
                 output_path
-            ]
+            ])
         else:
-            # Inject silent audio if source has no audio stream
+            # Inject silent audio if source has no audio stream or we muted it
             cmd = [
                 "ffmpeg", "-y",
-                "-ss", "0",
+                "-ss", str(start_time),
                 "-i", input_path,
                 "-f", "lavfi",
                 "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
-                "-t", str(duration),
+                "-t", str(output_duration),
                 "-vf", video_filter,
                 "-map", "0:v",
                 "-map", "1:a",

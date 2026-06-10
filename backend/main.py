@@ -6,10 +6,12 @@ from core.config import get_settings
 from core.models import VideoRequirement
 from services.dify_client import DifyClient, DifyError
 from api.video_jobs import router as video_jobs_router
+from api.assets import router as assets_router
 
 
 app = FastAPI(title="VideoCraft Agent API")
 app.include_router(video_jobs_router)
+app.include_router(assets_router)
 
 
 def custom_openapi():

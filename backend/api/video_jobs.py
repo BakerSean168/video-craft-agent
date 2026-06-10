@@ -1,94 +1,50 @@
-import uuid
-import shutil
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
-from fastapi import APIRouter, UploadFile, File, Form, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import FileResponse
 
 from core.models import VideoRequirement
-from core.schemas import UploadedMaterial, VideoJob, VideoJobStatus
+from core.schemas import VideoJob, VideoJobStatus, CreateVideoJobRequest
 from services.video_pipeline import VideoPipeline
+from pydantic import BaseModel
+
+class ConvertRequest(BaseModel):
+    target_format: str
 
 logger = logging.getLogger(__name__)
-
-ALLOWED_EXTENSIONS = {".mp4", ".mov", ".avi", ".webm", ".mkv"}
-MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
 
 router = APIRouter(prefix="/api/video-jobs", tags=["video-jobs"])
 pipeline = VideoPipeline()
 
 
+@router.get("")
+def list_video_jobs(limit: int = 50) -> list[VideoJob]:
+    return pipeline.db.list_jobs(limit)
+
+
 @router.post("")
 def create_video_job(
-    background_tasks: BackgroundTasks,
-    product_name: str = Form("AI 编程训练营"),
-    target_audience: str = Form("想转行 AI 的程序员"),
-    selling_points: str = Form("零基础入门 AI Agent, 带项目实战, 适合 Python 初学者"),
-    style: str = Form("科技感、快节奏"),
-    platform: str = Form("douyin"),
-    duration_seconds: int = Form(15),
-    files: list[UploadFile] = File(default=[], alias="files[]")
+    request: CreateVideoJobRequest,
+    background_tasks: BackgroundTasks
 ) -> dict:
     # Split selling points if comma separated, otherwise wrap in list
-    points = [p.strip() for p in selling_points.split(",") if p.strip()]
+    points = [p.strip() for p in request.selling_points.split(",") if p.strip()]
     if not points:
-        points = [selling_points]
+        points = [request.selling_points]
 
     requirement = VideoRequirement(
-        product_name=product_name,
-        target_audience=target_audience,
+        product_name=request.product_name,
+        target_audience=request.target_audience,
         selling_points=points,
-        style=style,
-        platform=platform,
-        duration_seconds=duration_seconds
+        style=request.style,
+        platform=request.platform,
+        duration_seconds=request.duration_seconds
     )
 
-    # Initialize job in pipeline
-    job = pipeline.create_job(requirement, [])
-    
-    # Save uploaded files if any
-    uploads = []
-    if files:
-        # Validate all files first
-        for f in files:
-            if not f.filename:
-                continue
-            ext = Path(f.filename).suffix.lower()
-            if ext not in ALLOWED_EXTENSIONS:
-                raise HTTPException(status_code=400, detail=f"Unsupported file format: {ext}")
-            if hasattr(f, "size") and f.size and f.size > MAX_FILE_SIZE:
-                raise HTTPException(status_code=400, detail="File size exceeds the 100MB limit")
-
-        job_upload_dir = pipeline.uploads_dir / job.job_id
-        job_upload_dir.mkdir(parents=True, exist_ok=True)
-        
-        for f in files:
-            if not f.filename:
-                continue
-            file_path = job_upload_dir / f.filename
-            
-            with file_path.open("wb") as buffer:
-                shutil.copyfileobj(f.file, buffer)
-                
-            uploads.append(
-                UploadedMaterial(
-                    file_id=str(uuid.uuid4()),
-                    original_name=f.filename,
-                    content_type=f.content_type or "video/mp4",
-                    local_path=str(file_path),
-                    size_bytes=file_path.stat().st_size
-                )
-            )
-            
-    # Update job with uploaded materials details
-    job.uploads = uploads
-    job.status = VideoJobStatus.upload_saved
-    job.current_step = "上传素材已保存"
-    
-    # Put job status back to queued before running background task
-    job.status = VideoJobStatus.queued
+    # Initialize job in pipeline using selected asset_ids from library
+    job = pipeline.create_job(requirement, request.asset_ids)
     
     # Trigger the background pipeline run
     background_tasks.add_task(pipeline.run_pipeline_sync, job.job_id)
@@ -106,12 +62,6 @@ def get_video_job(job_id: str) -> VideoJob:
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return job
-
-
-from pydantic import BaseModel
-
-class ConvertRequest(BaseModel):
-    target_format: str
 
 
 @router.post("/{job_id}/convert")

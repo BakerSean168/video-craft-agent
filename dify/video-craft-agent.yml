@@ -1,0 +1,370 @@
+app:
+  description: ''
+  icon: 🤖
+  icon_background: '#FFEAD5'
+  icon_type: emoji
+  mode: workflow
+  name: video-craft-agent
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/openai:0.4.2@21195ee1321849e0a7d4b3f6b2fd8c2be23ea6c7182e1b444ecc4c1711b52468
+    version: null
+kind: app
+version: 0.6.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      fileUploadConfig:
+        attachment_image_file_size_limit: 2
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        file_upload_limit: 50
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: ''
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: llm
+      id: 1780887335037-source-1780887584790-target
+      source: '1780887335037'
+      sourceHandle: source
+      target: '1780887584790'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: code
+      id: 1780887584790-source-1780887596794-target
+      selected: false
+      source: '1780887584790'
+      sourceHandle: source
+      target: '1780887596794'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: end
+      id: 1780887596794-source-1780887609304-target
+      selected: false
+      source: '1780887596794'
+      sourceHandle: source
+      target: '1780887609304'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: true
+        title: 用户输入
+        type: start
+        variables:
+        - default: ''
+          hint: ''
+          label: product_name
+          max_length: null
+          options: []
+          placeholder: ''
+          required: true
+          type: text-input
+          variable: product_name
+        - default: ''
+          hint: ''
+          label: target_audience
+          options: []
+          placeholder: ''
+          required: true
+          type: text-input
+          variable: target_audience
+        - default: ''
+          hint: ''
+          label: selling_points
+          options: []
+          placeholder: ''
+          required: true
+          type: text-input
+          variable: selling_points
+        - default: ''
+          hint: ''
+          label: style
+          options: []
+          placeholder: ''
+          required: true
+          type: text-input
+          variable: style
+        - default: ''
+          hint: ''
+          label: platform
+          options: []
+          placeholder: ''
+          required: true
+          type: text-input
+          variable: platform
+        - default: ''
+          hint: ''
+          label: duration_seconds
+          options: []
+          placeholder: ''
+          required: true
+          type: number
+          variable: duration_seconds
+        - default: ''
+          hint: ''
+          label: assets_json
+          options: []
+          placeholder: ''
+          required: false
+          type: text-input
+          variable: assets_json
+      height: 260
+      id: '1780887335037'
+      position:
+        x: 80
+        y: 282
+      positionAbsolute:
+        x: 80
+        y: 282
+      selected: true
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            temperature: 0.7
+          mode: chat
+          name: gpt-4o-mini
+          provider: langgenius/openai/openai
+        prompt_config:
+          jinja2_variables:
+          - value_selector:
+            - '1780887335037'
+            - product_name
+            value_type: string
+            variable: product_name
+          - value_selector:
+            - '1780887335037'
+            - target_audience
+            value_type: string
+            variable: target_audience
+          - value_selector:
+            - '1780887335037'
+            - selling_points
+            value_type: string
+            variable: selling_points
+          - value_selector:
+            - '1780887335037'
+            - style
+            value_type: string
+            variable: style
+          - value_selector:
+            - '1780887335037'
+            - platform
+            value_type: string
+            variable: platform
+          - value_selector:
+            - '1780887335037'
+            - duration_seconds
+            value_type: number
+            variable: duration_seconds
+          - value_selector:
+            - '1780887335037'
+            - assets_json
+            value_type: string
+            variable: assets_json
+        prompt_template:
+        - edition_type: jinja2
+          id: cc5643e7-0e10-4597-b381-7ba777807409
+          jinja2_text: "你是一个短视频剪辑与脚本策划大师。请根据以下产品信息和上传的视频素材画像，生成一个精确的视频剪辑方案 (EditPlan) JSON。\r\n\r\n产品名称：{{product_name}}\r\n目标用户：{{target_audience}}\r\n卖点：{{selling_points}}\r\n风格：{{style}}\r\n平台：{{platform}}\r\n视频所需总时长：{{duration_seconds}} 秒\r\n\r\n已上传素材画像 JSON (assets_json)：\r\n{{assets_json}}\r\n\r\n策划规则：\r\n1. 只能使用 assets_json 中存在的 asset_id。\r\n2. 从素材中截取的片段（由 source_start 和 source_end 指定）必须落在该素材实际的时长或语义片段 (segments) 时间范围内。\r\n3. 设计 timeline 的 start_time 和 end_time，首个场景从 0.0 开始，下一个场景的 start_time 必须等于上一个场景的 end_time，且最后一个场景的 end_time 应尽可能接近视频所需总时长 {{duration_seconds}} 秒。\r\n4. 结合素材画像的 tags 和 content_summary 选择画面：比如在开头（前3秒）优先使用 content_summary 中具有 hook 营销特性的素材画面；中间部分使用 product_intro 或 feature_demo 的画面；结尾使用 cta 或 slogan 的画面。\r\n5. 为每一个分镜分配合适的屏幕字幕 (subtitle) 和旁白 (voiceover)，使其紧扣产品卖点并符合风格特征。\r\n6. 只输出 JSON，不要 Markdown，不要解释文字。\r\n\r\n输出 JSON 示例：\r\n{\r\n  \"title\": \"AI编程短视频脚本\",\r\n  \"aspect_ratio\": \"9:16\",\r\n  \"duration_seconds\": 15,\r\n  \"timeline\": [\r\n    {\r\n      \"scene_id\": 1,\r\n      \"asset_id\": \"asset_001\",\r\n      \"source_start\": 2.0,\r\n      \"source_end\": 7.0,\r\n      \"start_time\": 0.0,\r\n      \"end_time\": 5.0,\r\n      \"subtitle\": \"想转行AI程序员？看这里！\",\r\n      \"voiceover\": \"想要高薪转型AI程序员？不要错过！\",\r\n      \"operation\": {\r\n        \"speed\": 1.0,\r\n        \"crop_mode\": \"center_crop\",\r\n        \"mute_audio\": false\r\n      }\r\n    }\r\n  ]\r\n}"
+          role: system
+          text: "你是一个短视频剪辑与脚本策划大师。请根据以下产品信息和上传的视频素材画像，生成一个精确的视频剪辑方案 (EditPlan) JSON。\n\n产品名称：{{product_name}}\n目标用户：{{target_audience}}\n卖点：{{selling_points}}\n风格：{{style}}\n平台：{{platform}}\n视频所需总时长：{{duration_seconds}} 秒\n\n已上传素材画像 JSON (assets_json)：\n{{assets_json}}\n\n策划规则：\n1. 只能使用 assets_json 中存在的 asset_id。\n2. 从素材中截取的片段（由 source_start 和 source_end 指定）必须落在该素材实际的时长或语义片段 (segments) 时间范围内。\n3. 设计 timeline 的 start_time 和 end_time，首个场景从 0.0 开始，下一个场景的 start_time 必须等于上一个场景的 end_time，且最后一个场景的 end_time 应尽可能接近视频所需总时长 {{duration_seconds}} 秒。\n4. 结合素材画像的 tags 和 content_summary 选择画面：比如在开头（前3秒）优先使用 content_summary 中具有 hook 营销特性的素材画面；中间部分使用 product_intro 或 feature_demo 的画面；结尾使用 cta 或 slogan 的画面。\n5. 为每一个分镜分配合适的屏幕字幕 (subtitle) 和旁白 (voiceover)，使其紧扣产品卖点并符合风格特征。\n6. 只输出 JSON，不要 Markdown，不要解释文字。\n\n输出 JSON 示例：\n{\n  \"title\": \"AI编程短视频脚本\",\n  \"aspect_ratio\": \"9:16\",\n  \"duration_seconds\": 15,\n  \"timeline\": [\n    {\n      \"scene_id\": 1,\n      \"asset_id\": \"asset_001\",\n      \"source_start\": 2.0,\n      \"source_end\": 7.0,\n      \"start_time\": 0.0,\n      \"end_time\": 5.0,\n      \"subtitle\": \"想转行AI程序员？看这里！\",\n      \"voiceover\": \"想要高薪转型AI程序员？不要错过！\",\n      \"operation\": {\n        \"speed\": 1.0,\n        \"crop_mode\": \"center_crop\",\n        \"mute_audio\": false\n      }\n    }\n  ]\n}"
+        selected: false
+        structured_output:
+          schema:
+            additionalProperties: false
+            properties:
+              aspect_ratio:
+                type: string
+              duration_seconds:
+                type: number
+              timeline:
+                items:
+                  additionalProperties: false
+                  properties:
+                    asset_id:
+                      type: string
+                    end_time:
+                      type: number
+                    operation:
+                      additionalProperties: false
+                      properties:
+                        crop_mode:
+                          type: string
+                        mute_audio:
+                          type: boolean
+                        speed:
+                          type: number
+                      required:
+                      - speed
+                      - mute_audio
+                      type: object
+                    scene_id:
+                      type: number
+                    source_end:
+                      type: number
+                    source_start:
+                      type: number
+                    start_time:
+                      type: number
+                    subtitle:
+                      type: string
+                    voiceover:
+                      type: string
+                  required:
+                  - scene_id
+                  - asset_id
+                  - source_start
+                  - source_end
+                  - start_time
+                  - end_time
+                  - subtitle
+                  type: object
+                type: array
+              title:
+                type: string
+            required:
+            - title
+            - aspect_ratio
+            - duration_seconds
+            - timeline
+            type: object
+        structured_output_enabled: true
+        title: LLM
+        type: llm
+        vision:
+          enabled: false
+      height: 87
+      id: '1780887584790'
+      position:
+        x: 382
+        y: 282
+      positionAbsolute:
+        x: 382
+        y: 282
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        code: "from typing import Any, Dict, List\nimport json\n\n\ndef main(llm_text: Any) -> dict:\n    def to_float(value: Any, default: float) -> float:\n        try:\n            if isinstance(value, bool):\n                return default\n            return float(value)\n        except (TypeError, ValueError):\n            return default\n\n    def to_int(value: Any, default: int) -> int:\n        try:\n            if isinstance(value, bool):\n                return default\n            return int(value)\n        except (TypeError, ValueError):\n            return default\n\n    if not llm_text:\n        edit_plan = {\n            \"title\": \"默认视频剪辑方案\",\n            \"aspect_ratio\": \"9:16\",\n            \"duration_seconds\": 15,\n            \"timeline\": [],\n            \"warnings\": [\"输入文本为空，返回默认方案\"]\n        }\n        return {\n            \"script_json_Object\": edit_plan\n        }\n\n    data = llm_text\n    if isinstance(llm_text, str):\n        try:\n            data = json.loads(llm_text)\n        except json.JSONDecodeError:\n            data = {}\n\n    if not isinstance(data, dict):\n        data = {}\n\n    title = data.get(\"title\") or \"未命名营销视频\"\n    aspect_ratio = data.get(\"aspect_ratio\") or \"9:16\"\n    timeline = data.get(\"timeline\") or []\n    if not isinstance(timeline, list):\n        timeline = []\n\n    cleaned_timeline: List[Dict[str, Any]] = []\n    for i, scene in enumerate(timeline):\n        if not isinstance(scene, dict):\n            continue\n\n        op = scene.get(\"operation\") or {}\n        if not isinstance(op, dict):\n            op = {}\n\n        cleaned_op = {\n            \"speed\": to_float(op.get(\"speed\"), 1.0),\n            \"crop_mode\": str(op.get(\"crop_mode\") or \"center_crop\"),\n            \"mute_audio\": bool(op.get(\"mute_audio\", False))\n        }\n\n        cleaned_timeline.append({\n            \"scene_id\": to_int(scene.get(\"scene_id\"), i + 1),\n            \"asset_id\": str(scene.get(\"asset_id\") or \"\"),\n            \"source_start\": to_float(scene.get(\"source_start\"), 0.0),\n            \"source_end\": to_float(scene.get(\"source_end\"), 5.0),\n            \"start_time\": to_float(scene.get(\"start_time\"), 0.0),\n            \"end_time\": to_float(scene.get(\"end_time\"), 5.0),\n            \"subtitle\": str(scene.get(\"subtitle\") or \"\"),\n            \"voiceover\": str(scene.get(\"voiceover\") or \"\"),\n            \"operation\": cleaned_op\n        })\n\n    duration_seconds = to_int(data.get(\"duration_seconds\"), 0)\n    if duration_seconds <= 0:\n        if cleaned_timeline:\n            duration_seconds = int(round(cleaned_timeline[-1][\"end_time\"]))\n        else:\n            duration_seconds = 15\n\n    edit_plan = {\n        \"title\": str(title),\n        \"aspect_ratio\": str(aspect_ratio),\n        \"duration_seconds\": duration_seconds,\n        \"timeline\": cleaned_timeline,\n        \"warnings\": data.get(\"warnings\") or []\n    }\n\n    return {\n        \"script_json_Object\": edit_plan\n    }"
+        code_language: python3
+        outputs:
+          script_json_Object:
+            children: null
+            type: object
+        selected: false
+        title: 代码执行
+        type: code
+        variables:
+        - value_selector:
+          - '1780887584790'
+          - structured_output
+          value_type: object
+          variable: llm_text
+      height: 51
+      id: '1780887596794'
+      position:
+        x: 687
+        y: 282
+      positionAbsolute:
+        x: 687
+        y: 282
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        outputs:
+        - value_selector:
+          - '1780887596794'
+          - script_json_Object
+          value_type: object
+          variable: script_json
+        selected: false
+        title: 输出
+        type: end
+      height: 87
+      id: '1780887609304'
+      position:
+        x: 984
+        y: 282
+      positionAbsolute:
+        x: 984
+        y: 282
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    viewport:
+      x: 69
+      y: 109
+      zoom: 1
+  rag_pipeline_variables: []

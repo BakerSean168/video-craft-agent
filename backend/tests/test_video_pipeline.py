@@ -1,7 +1,8 @@
 import pytest
 from pathlib import Path
 from core.models import VideoRequirement
-from core.schemas import VideoJobStatus, UploadedMaterial
+from core.schemas import VideoJobStatus, AssetLibraryItem
+from core.frame_models import AssetProfile, VideoMetadata
 from services.video_pipeline import VideoPipeline
 from unittest.mock import MagicMock
 
@@ -37,52 +38,9 @@ def test_video_pipeline_run_success(tmp_path, temp_video_generator, mocker):
     jobs_dir = tmp_path / "jobs"
     jobs_dir.mkdir(parents=True, exist_ok=True)
 
-    # Generate source video clip in uploads
+    # Generate source video clip in assets
     src_clip = temp_video_generator("my_test_video.mp4", duration=5)
-    upload_file = UploadedMaterial(
-        file_id="upload-1",
-        original_name="my_紧张_video.mp4",
-        content_type="video/mp4",
-        local_path=str(src_clip),
-        size_bytes=src_clip.stat().st_size
-    )
-
-    # Mock Dify Client
-    mock_dify_result = MagicMock()
-    mock_dify_result.script = {
-        "title": "TDD Pipeline Test",
-        "aspect_ratio": "9:16",
-        "duration_seconds": 6,
-        "scenes": [
-            {
-                "index": 1,
-                "duration_seconds": 3,
-                "subtitle": "Subtitle 1",
-                "voiceover": "Voiceover 1",
-                "visual_keywords": ["紧张"],
-                "source_hint": "uploaded_or_library"
-            },
-            {
-                "index": 2,
-                "duration_seconds": 3,
-                "subtitle": "Subtitle 2",
-                "voiceover": "Voiceover 2",
-                "visual_keywords": ["紧张"],
-                "source_hint": "uploaded_or_library"
-            }
-        ]
-    }
-    mocker.patch("services.dify_client.DifyClient.run_workflow", return_value=mock_dify_result)
-
-    requirement = VideoRequirement(
-        product_name="AI 编程",
-        target_audience="程序员",
-        selling_points="7天出作品",
-        style="紧张刺激",
-        platform="抖音",
-        duration_seconds=6
-    )
-
+    
     # Initialize Pipeline
     pipeline = VideoPipeline(
         library_dir=library_dir,
@@ -91,8 +49,87 @@ def test_video_pipeline_run_success(tmp_path, temp_video_generator, mocker):
         jobs_dir=jobs_dir
     )
 
+    # Save asset to database first
+    asset_id = "asset-1"
+    asset_profile = AssetProfile(
+        asset_id=asset_id,
+        original_name="my_test_video.mp4",
+        local_path=str(src_clip),
+        duration=5.0,
+        content_summary="测试视频画面内容",
+        tags=["coding"],
+        recommended_usage=["hook"],
+        segments=[],
+        metadata=VideoMetadata(
+            duration=5.0,
+            width=640,
+            height=360,
+            fps=25.0,
+            has_audio=True,
+            aspect_ratio="16:9"
+        )
+    )
+    asset_item = AssetLibraryItem(
+        asset_id=asset_id,
+        status="completed",
+        original_name="my_test_video.mp4",
+        local_path=str(src_clip),
+        profile=asset_profile
+    )
+    pipeline.db.save_asset(asset_item)
+
+    # Mock Dify Client
+    mock_dify_result = MagicMock()
+    mock_dify_result.script = {
+        "title": "TDD Pipeline Test",
+        "aspect_ratio": "9:16",
+        "duration_seconds": 6,
+        "timeline": [
+            {
+                "scene_id": 1,
+                "asset_id": "asset-1",
+                "source_start": 0.0,
+                "source_end": 3.0,
+                "start_time": 0.0,
+                "end_time": 3.0,
+                "subtitle": "Subtitle 1",
+                "voiceover": "Voiceover 1",
+                "operation": {
+                    "speed": 1.0,
+                    "crop_mode": "center_crop",
+                    "mute_audio": False
+                }
+            },
+            {
+                "scene_id": 2,
+                "asset_id": "asset-1",
+                "source_start": 2.0,
+                "source_end": 5.0,
+                "start_time": 3.0,
+                "end_time": 6.0,
+                "subtitle": "Subtitle 2",
+                "voiceover": "Voiceover 2",
+                "operation": {
+                    "speed": 1.0,
+                    "crop_mode": "center_crop",
+                    "mute_audio": False
+                }
+            }
+        ]
+    }
+    mocker.patch("services.dify_client.DifyClient.run_workflow", return_value=mock_dify_result)
+
+    requirement = VideoRequirement(
+        product_name="AI 编程",
+        target_audience="程序员",
+        selling_points=["7天出作品"],
+        style="紧张刺激",
+        platform="抖音",
+        duration_seconds=6
+    )
+
     # Create job
-    job = pipeline.create_job(requirement, [upload_file])
+    job = pipeline.create_job(requirement, [asset_id])
     assert job.status == VideoJobStatus.queued
 
     # Execute pipeline synchronously for test

@@ -18,6 +18,7 @@ class Settings:
     dify_api_key: str
     dify_user: str
     dify_script_output_key: str
+    frame_analyzer_url: str = "https://video-frame-analyzer.bakersean.workers.dev"
 
 
 def get_settings() -> Settings:
@@ -26,4 +27,5 @@ def get_settings() -> Settings:
         dify_api_key=os.getenv("DIFY_API_KEY", ""),
         dify_user=os.getenv("DIFY_USER", "video-craft-demo-user"),
         dify_script_output_key=os.getenv("DIFY_SCRIPT_OUTPUT_KEY", "script_json"),
+        frame_analyzer_url=os.getenv("FRAME_ANALYZER_URL", "https://video-frame-analyzer.bakersean.workers.dev"),
     )
