@@ -27,17 +27,15 @@ router = APIRouter(prefix="/api/assets", tags=["assets"])
 
 
 def analyze_asset_task(asset_id: str, file_path: str, original_name: str) -> None:
+    frames_dir = assets_dir / f"{asset_id}_frames"
     try:
         logger.info(f"Starting background asset analysis for {asset_id}")
-        
-        # Determine temporary frame extraction directory
-        temp_frames_dir = pipeline.jobs_dir / "temp_assets" / asset_id
         
         # Invoke frame service to run frame extraction and LLM analysis
         profile = pipeline.frame_service.analyze_asset(
             video_path=file_path,
             asset_id=asset_id,
-            output_frames_dir=temp_frames_dir
+            output_frames_dir=frames_dir
         )
         # Update original name to match upload
         profile.original_name = original_name
@@ -53,12 +51,13 @@ def analyze_asset_task(asset_id: str, file_path: str, original_name: str) -> Non
         pipeline.db.save_asset(item)
         logger.info(f"Asset analysis completed successfully for {asset_id}")
         
-        # Clean up temporary frames directory
-        if temp_frames_dir.exists():
-            shutil.rmtree(temp_frames_dir)
-            
     except Exception as e:
         logger.error(f"Failed to analyze asset {asset_id}: {e}")
+        if frames_dir.exists():
+            try:
+                shutil.rmtree(frames_dir)
+            except Exception:
+                pass
         item = AssetLibraryItem(
             asset_id=asset_id,
             status="failed",
@@ -67,6 +66,7 @@ def analyze_asset_task(asset_id: str, file_path: str, original_name: str) -> Non
             error=str(e)
         )
         pipeline.db.save_asset(item)
+
 
 
 @router.get("")
@@ -149,6 +149,14 @@ def delete_asset(asset_id: str) -> dict:
         except Exception as e:
             logger.warning(f"Failed to delete physical file {file_path}: {e}")
             
+    # Delete physical frames directory
+    frames_dir = assets_dir / f"{asset_id}_frames"
+    if frames_dir.exists():
+        try:
+            shutil.rmtree(frames_dir)
+        except Exception as e:
+            logger.warning(f"Failed to delete frames directory {frames_dir}: {e}")
+            
     return {"message": "素材已删除", "asset_id": asset_id}
 
 
@@ -171,3 +179,26 @@ def get_asset_video(asset_id: str) -> FileResponse:
     }
     media_type = media_types.get(ext, "video/mp4")
     return FileResponse(path=str(file_path), media_type=media_type)
+
+
+@router.get("/{asset_id}/frames/{frame_id}")
+def get_asset_frame(asset_id: str, frame_id: str) -> FileResponse:
+    frames_dir = (assets_dir / f"{asset_id}_frames").resolve()
+    if not frames_dir.exists():
+        raise HTTPException(status_code=404, detail="Frames directory not found")
+        
+    parts = frame_id.split("_f")
+    if len(parts) != 2 or not parts[1].isdigit():
+        raise HTTPException(status_code=400, detail="Invalid frame ID format")
+        
+    file_name = f"frame_{parts[1]}.jpg"
+    file_path = (frames_dir / file_name).resolve()
+    
+    if not file_path.is_relative_to(frames_dir):
+        raise HTTPException(status_code=400, detail="Invalid path traversal attempt")
+        
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail=f"Frame image not found: {file_name}")
+        
+    return FileResponse(path=str(file_path), media_type="image/jpeg")
+

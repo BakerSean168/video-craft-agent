@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { 
   Loader2, Trash2, AlertTriangle, Eye, Video, 
-  Layers, ChevronRight, HelpCircle
+  Layers
 } from 'lucide-react';
-import { AssetLibraryItem } from '../types';
+import type { AssetLibraryItem } from '../types';
 
 interface AssetDetailsProps {
   item: AssetLibraryItem;
@@ -186,6 +186,125 @@ export const AssetDetails: React.FC<AssetDetailsProps> = ({ item, onDelete }) =>
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Keyframes Process Section */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 md:p-6 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800/80 pb-3">
+              <div className="space-y-1">
+                <h3 className="font-bold text-slate-855 dark:text-slate-100 text-sm flex items-center gap-1.5">
+                  <Eye className="w-4.5 h-4.5 text-indigo-650" />
+                  <span>智能视觉帧流 (Frame-Level Perception Process)</span>
+                </h3>
+                <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                  视频分析的中间过程：提取关键帧图像，使用视觉大模型识别并返回独立帧结果
+                </p>
+              </div>
+              <span className="shrink-0 text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-550 dark:text-slate-400">
+                共提取 {item.profile.frames?.length || 0} 帧
+              </span>
+            </div>
+
+            {(!item.profile.frames || item.profile.frames.length === 0) ? (
+              <div className="text-center py-6 text-xs text-slate-400 dark:text-slate-500 italic">
+                未保留该素材的提取帧或旧版素材无帧记录。
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {item.profile.frames.map((frame, idx) => {
+                  const analysis = item.profile?.frame_analyses?.[idx];
+                  const hasError = !!analysis?.error;
+                  return (
+                    <div 
+                      key={frame.frame_id} 
+                      className={`border rounded-2xl overflow-hidden flex flex-col justify-between transition-all bg-slate-50/50 dark:bg-slate-950/20 ${
+                        hasError 
+                          ? 'border-rose-250 dark:border-rose-900/40 hover:shadow-rose-50/30' 
+                          : 'border-slate-200 dark:border-slate-800 hover:shadow-md hover:shadow-slate-100 dark:hover:shadow-none'
+                      }`}
+                    >
+                      {/* Image container */}
+                      <div className="relative aspect-video bg-black overflow-hidden group">
+                        <img
+                          src={`/api/assets/${item.asset_id}/frames/${frame.frame_id}`}
+                          alt={`Frame at ${frame.timestamp}s`}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                        {/* Timestamp badge */}
+                        <span className="absolute bottom-2 left-2 px-1.5 py-0.5 bg-black/60 backdrop-blur-xs text-white rounded text-[10px] font-mono font-semibold">
+                          {frame.timestamp.toFixed(1)}s
+                        </span>
+                        {/* Frame Number badge */}
+                        <span className="absolute top-2 right-2 px-1.5 py-0.5 bg-indigo-650/90 text-white rounded text-[9px] font-bold uppercase tracking-wider">
+                          #{(idx + 1).toString().padStart(2, '0')}
+                        </span>
+                      </div>
+
+                      {/* Content details */}
+                      <div className="p-3 space-y-2 flex-1 flex flex-col justify-between">
+                        <div className="space-y-1.5">
+                          {hasError ? (
+                            <div className="text-[11px] text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/20 border border-rose-100/50 dark:border-rose-900/30 p-2.5 rounded-xl flex gap-1.5 items-start">
+                              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-rose-500" />
+                              <div className="space-y-0.5">
+                                <span className="font-bold text-xs">分析异常:</span>
+                                <p className="leading-tight break-all text-[10px] font-mono opacity-90">{analysis.error}</p>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <p className="text-xs text-slate-700 dark:text-slate-300 font-medium leading-relaxed line-clamp-3" title={analysis?.description_cn}>
+                                {analysis?.description_cn || '未能识别画面内容'}
+                              </p>
+                              
+                              {/* Small details if successful */}
+                              {analysis && (
+                                <div className="space-y-1 pt-1.5 border-t border-slate-100 dark:border-slate-800/80">
+                                  {analysis.scene_environment && analysis.scene_environment !== 'other' && (
+                                    <div className="flex justify-between text-[10px]">
+                                      <span className="text-slate-400">环境:</span>
+                                      <span className="font-semibold text-slate-600 dark:text-slate-400">{analysis.scene_environment}</span>
+                                    </div>
+                                  )}
+                                  {analysis.shot_type && analysis.shot_type !== 'other' && (
+                                    <div className="flex justify-between text-[10px]">
+                                      <span className="text-slate-400">镜头:</span>
+                                      <span className="font-semibold text-slate-600 dark:text-slate-400">{analysis.shot_type}</span>
+                                    </div>
+                                  )}
+                                  {analysis.marketing_role && analysis.marketing_role !== 'filler' && (
+                                    <div className="flex justify-between text-[10px]">
+                                      <span className="text-slate-400">角色:</span>
+                                      <span className="font-semibold text-indigo-600 dark:text-indigo-400">{analysis.marketing_role.toUpperCase()}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+
+                        {/* Tags list */}
+                        {analysis?.tags && analysis.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 pt-1.5 border-t border-slate-100 dark:border-slate-800/80">
+                            {analysis.tags.slice(0, 3).map((tag, tIdx) => (
+                              <span key={tIdx} className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded text-[9px]">
+                                #{tag}
+                              </span>
+                            ))}
+                            {analysis.tags.length > 3 && (
+                              <span className="text-[9px] text-slate-400 self-center">
+                                +{analysis.tags.length - 3}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Aggregated content summary */}

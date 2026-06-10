@@ -186,8 +186,8 @@ class FrameService:
             return FrameAnalysis(**analysis_data)
         except Exception as e:
             logger.error(f"Failed to analyze frame {frame.frame_id}: {e}")
-            # Return fallback DEFAULT_FRAME_ANALYSIS
-            return FrameAnalysis()
+            # Return fallback DEFAULT_FRAME_ANALYSIS with error details
+            return FrameAnalysis(description_cn="未能识别画面内容", error=str(e))
 
     def get_secondary_summary(self, descriptions: List[str]) -> str:
         """Call Cloudflare Worker summarize endpoint to get a single unified summary."""
@@ -300,17 +300,6 @@ class FrameService:
                     )
                 )
         
-        # Clean up frame images on disk to save space
-        for f in output_frames_dir.glob("frame_*.jpg"):
-            try:
-                f.unlink()
-            except Exception:
-                pass
-        try:
-            output_frames_dir.rmdir()
-        except Exception:
-            pass
-            
         return AssetProfile(
             asset_id=asset_id,
             original_name=os.path.basename(video_path),
@@ -320,8 +309,11 @@ class FrameService:
             tags=list(all_tags),
             recommended_usage=list(recommended_usages),
             segments=segments,
-            metadata=metadata
+            metadata=metadata,
+            frames=frames,
+            frame_analyses=analyses
         )
+
 
     def _create_segment(
         self,

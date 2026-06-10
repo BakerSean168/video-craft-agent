@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, AlertCircle, Database, Film, Clock, Check } from 'lucide-react';
+import { Sparkles, AlertCircle, Database, Clock, Check } from 'lucide-react';
 import type { AssetLibraryItem, CreateVideoJobRequest } from '../types';
 
 interface NewJobFormProps {
@@ -182,11 +182,11 @@ export const NewJobForm: React.FC<NewJobFormProps> = ({ assets, onSubmit, onCanc
               onChange={(e) => setDurationSeconds(parseInt(e.target.value))}
               className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-600 dark:accent-indigo-400 focus:outline-none"
             />
-            <div className="flex justify-between text-[10px] text-slate-400 dark:text-slate-500">
-              <span>5 秒</span>
-              <span>15 秒 (推荐)</span>
-              <span>30 秒</span>
-              <span>60 秒</span>
+            <div className="relative w-full h-4 text-[10px] text-slate-400 dark:text-slate-500 mt-1 select-none">
+              <span className="absolute left-0">5 秒</span>
+              <span className="absolute left-[18.18%] -translate-x-1/2 whitespace-nowrap">15 秒 (推荐)</span>
+              <span className="absolute left-[45.45%] -translate-x-1/2 whitespace-nowrap">30 秒</span>
+              <span className="absolute right-0">60 秒</span>
             </div>
           </div>
 

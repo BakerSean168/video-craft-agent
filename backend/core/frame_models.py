@@ -32,6 +32,7 @@ class FrameAnalysis(BaseModel):
     tags: List[str] = Field(default_factory=list, description="画面标签")
     people_count: int = Field(default=0, description="画面中人类的数量")
     text_on_screen: List[str] = Field(default_factory=list, description="画面中的OCR文字")
+    error: Optional[str] = Field(default=None, description="分析错误描述")
 
 class AssetSegment(BaseModel):
     segment_id: str = Field(..., description="片段唯一ID")
@@ -52,3 +53,6 @@ class AssetProfile(BaseModel):
     recommended_usage: List[str] = Field(default_factory=list, description="推荐视频用途列表")
     segments: List[AssetSegment] = Field(default_factory=list, description="视频语义分段")
     metadata: VideoMetadata = Field(..., description="视频详细元数据")
+    frames: List[FrameInfo] = Field(default_factory=list, description="提取的帧信息")
+    frame_analyses: List[FrameAnalysis] = Field(default_factory=list, description="每一帧的分析结果")
+

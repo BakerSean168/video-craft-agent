@@ -88,6 +88,33 @@ export interface AssetSegment {
   quality_score: number;
 }
 
+export interface FrameInfo {
+  frame_id: string;
+  asset_id: string;
+  timestamp: number;
+  image_path: string;
+}
+
+export interface FrameAnalysis {
+  description_cn: string;
+  description_en?: string;
+  shot_type: string;
+  main_subject?: string;
+  objects: string[];
+  human_presence: string;
+  product_visibility: string;
+  scene_environment: string;
+  action?: string;
+  visual_quality: string;
+  quality_score: number;
+  marketing_role: string;
+  editing_suggestion?: string;
+  tags: string[];
+  people_count: number;
+  text_on_screen: string[];
+  error?: string;
+}
+
 export interface AssetProfile {
   asset_id: string;
   original_name: string;
@@ -98,7 +125,10 @@ export interface AssetProfile {
   recommended_usage: string[];
   segments: AssetSegment[];
   metadata: VideoMetadata;
+  frames?: FrameInfo[];
+  frame_analyses?: FrameAnalysis[];
 }
+
 
 export interface VideoJob {
   job_id: string;
