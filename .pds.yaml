@@ -1,0 +1,14 @@
+apiVersion: pds/v1alpha1
+kind: Component
+metadata:
+  id: video-craft-agent
+  name: Video Craft Agent
+spec:
+  type: media-agent
+  domain: products
+  lifecycle: experimental
+  repository:
+    url: https://github.com/BakerSean168/video-craft-agent.git
+    visibility: public
+  provides:
+    - pds://products/app/video-craft-agent
