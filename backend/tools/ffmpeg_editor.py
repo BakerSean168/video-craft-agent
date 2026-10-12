@@ -6,12 +6,17 @@ from typing import Optional
 
 
 def get_escaped_font_path() -> str | None:
-    # Try common Windows font paths first, then fallbacks
+    # Try common Windows font paths first, then Linux paths, then fallbacks
     paths = [
         "C:/Windows/Fonts/msyh.ttc",  # Microsoft YaHei
         "C:/Windows/Fonts/msyh.ttf",
         "C:/Windows/Fonts/simsun.ttc",  # SimSun
         "C:/Windows/Fonts/arial.ttf",   # Arial
+        # Linux paths (e.g. WenQuanYi Micro Hei or Noto CJK)
+        "/usr/share/fonts/wqy-microhei/wqy-microhei.ttc",
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        "/usr/share/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
     ]
     for p in paths:
         if os.path.exists(p):

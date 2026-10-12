@@ -1,0 +1,76 @@
+{
+  "$schema": "https://repomix.com/schemas/latest/schema.json",
+  "input": {
+    "maxFileSize": 1500000
+  },
+  "output": {
+    "filePath": "tmp/repomix/video-craft-agent-context.xml",
+    "style": "xml",
+    "parsableStyle": false,
+    "compress": false,
+    "instructionFilePath": "repomix-instruction.md",
+    "fileSummary": true,
+    "directoryStructure": true,
+    "files": true,
+    "removeComments": false,
+    "removeEmptyLines": false,
+    "topFilesLength": 10,
+    "showLineNumbers": false,
+    "truncateBase64": true,
+    "tokenCountTree": 5000,
+    "git": {
+      "sortByChanges": true,
+      "sortByChangesMaxCommits": 100,
+      "includeDiffs": false,
+      "includeLogs": false,
+      "includeLogsCount": 20
+    }
+  },
+  "include": [
+    "README.md",
+    "AGENTS.md",
+    "docs/**",
+    "backend/**/*.py",
+    "backend/pyproject.toml",
+    "backend/README.md",
+    "frontend/package.json",
+    "frontend/index.html",
+    "frontend/src/**",
+    "frontend/*.config.*",
+    "dify/**"
+  ],
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": [
+      ".git/**",
+      "**/__pycache__/**",
+      "**/.pytest_cache/**",
+      "**/.venv/**",
+      "**/node_modules/**",
+      "storage/**",
+      "tmp/**",
+      "assets/**",
+      "asserts/**",
+      "**/*.png",
+      "**/*.jpg",
+      "**/*.jpeg",
+      "**/*.gif",
+      "**/*.webp",
+      "**/*.mp4",
+      "**/*.mov",
+      "**/*.avi",
+      "**/*.mkv",
+      "**/*.mp3",
+      "**/*.wav",
+      ".env*",
+      "!/.env.example"
+    ]
+  },
+  "security": {
+    "enableSecurityCheck": true
+  },
+  "tokenCount": {
+    "encoding": "o200k_base"
+  }
+}
