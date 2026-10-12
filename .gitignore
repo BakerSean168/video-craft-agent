@@ -24,6 +24,9 @@ env/
 # Local storage and generated files (Jobs, uploads and final outputs)
 storage/
 **/storage/
+tmp/
+.codegraph/
+repomix-output.*
 
 # Large media assets (prevent committing large video/audio files to Git)
 *.mp4
